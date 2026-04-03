@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Australia Flight Tracker — Cowra, NSW</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0e17;
+            color: #e0e6ed;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            background: #111827;
+            border-bottom: 1px solid #1e293b;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            z-index: 1000;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-left h1 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #f1f5f9;
+            white-space: nowrap;
+        }
+
+        .header-left .subtitle {
+            font-size: 12px;
+            color: #64748b;
+            white-space: nowrap;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.error { background: #ef4444; animation: none; }
+        .status-dot.loading { background: #f59e0b; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .aircraft-count {
+            background: #1e293b;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #38bdf8;
+        }
+
+        .btn {
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: #e2e8f0;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        .btn:hover { background: #334155; }
+        .btn.active { background: #2563eb; border-color: #3b82f6; }
+
+        #map {
+            flex: 1;
+            width: 100%;
+        }
+
+        .info-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 16px;
+            background: rgba(17, 24, 39, 0.95);
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            padding: 12px 16px;
+            z-index: 1000;
+            min-width: 200px;
+            backdrop-filter: blur(8px);
+            font-size: 13px;
+            max-width: 90vw;
+        }
+
+        .info-panel h3 {
+            font-size: 14px;
+            color: #38bdf8;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .info-panel .row {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            gap: 12px;
+        }
+
+        .info-panel .label {
+            color: #64748b;
+        }
+
+        .info-panel .value {
+            color: #e2e8f0;
+            font-weight: 500;
+            text-align: right;
+        }
+
+        .info-panel .close-btn {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: #64748b;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+        }
+
+        .info-panel .close-btn:hover { color: #e2e8f0; }
+
+        .controls {
+            position: absolute;
+            top: 70px;
+            right: 16px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .controls .btn {
+            padding: 8px 10px;
+            font-size: 14px;
+            text-align: center;
+            min-width: 36px;
+        }
+
+        .leaflet-popup-content-wrapper {
+            background: #111827;
+            color: #e2e8f0;
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+        }
+
+        .leaflet-popup-tip { background: #111827; }
+
+        .leaflet-popup-content {
+            margin: 10px 14px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .popup-callsign {
+            font-size: 15px;
+            font-weight: 600;
+            color: #38bdf8;
+            margin-bottom: 6px;
+        }
+
+        .popup-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .popup-label { color: #64748b; }
+        .popup-value { color: #e2e8f0; font-weight: 500; }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 16px;
+            background: rgba(17, 24, 39, 0.95);
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            padding: 10px 14px;
+            z-index: 1000;
+            font-size: 12px;
+            backdrop-filter: blur(8px);
+        }
+
+        .legend h4 {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 6px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 2px 0;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(17, 24, 39, 0.9);
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            padding: 20px 30px;
+            z-index: 1001;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .loading-overlay .spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid #1e293b;
+            border-top-color: #38bdf8;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 600px) {
+            header { padding: 8px 12px; }
+            .header-left h1 { font-size: 14px; }
+            .header-left .subtitle { display: none; }
+            .info-panel { bottom: 10px; left: 10px; right: 10px; min-width: auto; }
+            .legend { bottom: 10px; right: 10px; }
+            .controls { top: 60px; right: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <h1>Flight Tracker</h1>
+            <span class="subtitle">Cowra, NSW &mdash; Australia</span>
+        </div>
+        <div class="header-right">
+            <span class="aircraft-count" id="aircraftCount">0 aircraft</span>
+            <span class="status-indicator">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Connecting...</span>
+            </span>
+        </div>
+    </header>
+
+    <div id="map"></div>
+
+    <div class="controls">
+        <button class="btn" id="btnCenter" title="Re-centre on Cowra">&#8982;</button>
+        <button class="btn" id="btnRefresh" title="Refresh now">&#8635;</button>
+        <button class="btn" id="btnAustralia" title="Zoom to Australia">AU</button>
+    </div>
+
+    <div class="legend">
+        <h4>Altitude</h4>
+        <div class="legend-item"><span class="legend-color" style="background:#22c55e"></span> Ground</div>
+        <div class="legend-item"><span class="legend-color" style="background:#38bdf8"></span> Low (&lt;3km)</div>
+        <div class="legend-item"><span class="legend-color" style="background:#a78bfa"></span> Mid (3-8km)</div>
+        <div class="legend-item"><span class="legend-color" style="background:#f472b6"></span> High (&gt;8km)</div>
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        Fetching aircraft data...
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        (function () {
+            'use strict';
+
+            // --- Config ---
+            const COWRA = { lat: -33.8278, lng: 148.6494 };
+            const DEFAULT_ZOOM = 8;
+            const AUSTRALIA_BOUNDS = { lamin: -44, lamax: -10, lomin: 112, lomax: 155 };
+            const REFRESH_INTERVAL_MS = 15000;
+            const OPENSKY_API = 'https://opensky-network.org/api/states/all';
+
+            // --- State ---
+            let map;
+            let aircraftLayer;
+            let selectedIcao = null;
+            let refreshTimer = null;
+            let infoPanel = null;
+
+            // --- Altitude color ---
+            function altitudeColor(altMeters) {
+                if (altMeters === null || altMeters <= 0) return '#22c55e';
+                if (altMeters < 3000) return '#38bdf8';
+                if (altMeters < 8000) return '#a78bfa';
+                return '#f472b6';
+            }
+
+            // --- Aircraft SVG icon ---
+            function createAircraftIcon(heading, altitude, isSelected) {
+                const color = altitudeColor(altitude);
+                const size = isSelected ? 28 : 22;
+                const rotation = heading !== null ? heading : 0;
+                const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${color}" style="transform:rotate(${rotation}deg);filter:drop-shadow(0 1px 3px rgba(0,0,0,0.5))${isSelected ? ';stroke:#fff;stroke-width:1' : ''}">
+                    <path d="M12 2L8 9H3l2 4-2 4h5l4 7 4-7h5l-2-4 2-4h-5L12 2z"/>
+                </svg>`;
+                return L.divIcon({
+                    html: svg,
+                    iconSize: [size, size],
+                    iconAnchor: [size / 2, size / 2],
+                    className: ''
+                });
+            }
+
+            // --- Format helpers ---
+            function formatAlt(m) {
+                if (m === null || m === undefined) return '—';
+                const ft = Math.round(m * 3.28084);
+                return `${ft.toLocaleString()} ft (${Math.round(m).toLocaleString()} m)`;
+            }
+
+            function formatSpeed(ms) {
+                if (ms === null || ms === undefined) return '—';
+                const knots = Math.round(ms * 1.94384);
+                const kmh = Math.round(ms * 3.6);
+                return `${knots} kts (${kmh} km/h)`;
+            }
+
+            function formatHeading(deg) {
+                if (deg === null || deg === undefined) return '—';
+                const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+                const idx = Math.round(deg / 22.5) % 16;
+                return `${Math.round(deg)}° ${dirs[idx]}`;
+            }
+
+            function formatVertRate(rate) {
+                if (rate === null || rate === undefined) return '—';
+                const fpm = Math.round(rate * 196.85);
+                if (fpm > 100) return `+${fpm} ft/min ▲`;
+                if (fpm < -100) return `${fpm} ft/min ▼`;
+                return 'Level';
+            }
+
+            // --- Parse OpenSky response ---
+            function parseAircraftStates(data) {
+                if (!data || !data.states) return [];
+                return data.states
+                    .filter(function (s) { return s[5] !== null && s[6] !== null; })
+                    .map(function (s) {
+                        return {
+                            icao24: s[0],
+                            callsign: (s[1] || '').trim(),
+                            originCountry: s[2],
+                            longitude: s[5],
+                            latitude: s[6],
+                            altitude: s[7],      // baro_altitude
+                            onGround: s[8],
+                            velocity: s[9],
+                            heading: s[10],       // true_track
+                            verticalRate: s[11],
+                            geoAltitude: s[13],
+                            squawk: s[14]
+                        };
+                    });
+            }
+
+            // --- Status UI ---
+            function setStatus(state, text) {
+                var dot = document.getElementById('statusDot');
+                var txt = document.getElementById('statusText');
+                dot.className = 'status-dot' + (state === 'ok' ? '' : ' ' + state);
+                txt.textContent = text;
+            }
+
+            function setAircraftCount(n) {
+                document.getElementById('aircraftCount').textContent = n + ' aircraft';
+            }
+
+            function showLoading(visible) {
+                document.getElementById('loadingOverlay').style.display = visible ? '' : 'none';
+            }
+
+            // --- Info panel ---
+            function showInfoPanel(ac) {
+                removeInfoPanel();
+                selectedIcao = ac.icao24;
+
+                var panel = document.createElement('div');
+                panel.className = 'info-panel';
+                panel.id = 'infoPanel';
+                panel.innerHTML =
+                    '<button class="close-btn" id="closePanel">&times;</button>' +
+                    '<h3>' + (ac.callsign || ac.icao24.toUpperCase()) + '</h3>' +
+                    '<div class="row"><span class="label">ICAO</span><span class="value">' + ac.icao24.toUpperCase() + '</span></div>' +
+                    '<div class="row"><span class="label">Country</span><span class="value">' + (ac.originCountry || '—') + '</span></div>' +
+                    '<div class="row"><span class="label">Altitude</span><span class="value">' + formatAlt(ac.altitude) + '</span></div>' +
+                    '<div class="row"><span class="label">Speed</span><span class="value">' + formatSpeed(ac.velocity) + '</span></div>' +
+                    '<div class="row"><span class="label">Heading</span><span class="value">' + formatHeading(ac.heading) + '</span></div>' +
+                    '<div class="row"><span class="label">Vert. Rate</span><span class="value">' + formatVertRate(ac.verticalRate) + '</span></div>' +
+                    '<div class="row"><span class="label">Squawk</span><span class="value">' + (ac.squawk || '—') + '</span></div>' +
+                    '<div class="row"><span class="label">Status</span><span class="value">' + (ac.onGround ? 'On Ground' : 'Airborne') + '</span></div>';
+
+                document.body.appendChild(panel);
+                infoPanel = panel;
+
+                document.getElementById('closePanel').addEventListener('click', function () {
+                    removeInfoPanel();
+                    selectedIcao = null;
+                    renderAircraft(lastAircraftData);
+                });
+            }
+
+            function removeInfoPanel() {
+                var existing = document.getElementById('infoPanel');
+                if (existing) existing.remove();
+                infoPanel = null;
+            }
+
+            // --- Fetch aircraft ---
+            var lastAircraftData = [];
+
+            function getBoundingBox() {
+                var bounds = map.getBounds();
+                return {
+                    lamin: Math.max(bounds.getSouth(), AUSTRALIA_BOUNDS.lamin),
+                    lamax: Math.min(bounds.getNorth(), AUSTRALIA_BOUNDS.lamax),
+                    lomin: Math.max(bounds.getWest(), AUSTRALIA_BOUNDS.lomin),
+                    lomax: Math.min(bounds.getEast(), AUSTRALIA_BOUNDS.lomax)
+                };
+            }
+
+            function fetchAircraft() {
+                var bbox = getBoundingBox();
+                var url = OPENSKY_API +
+                    '?lamin=' + bbox.lamin +
+                    '&lamax=' + bbox.lamax +
+                    '&lomin=' + bbox.lomin +
+                    '&lomax=' + bbox.lomax;
+
+                setStatus('loading', 'Updating...');
+
+                fetch(url)
+                    .then(function (res) {
+                        if (!res.ok) {
+                            if (res.status === 429) {
+                                throw new Error('Rate limited — retrying in 30s');
+                            }
+                            throw new Error('API error: ' + res.status);
+                        }
+                        return res.json();
+                    })
+                    .then(function (data) {
+                        lastAircraftData = parseAircraftStates(data);
+                        renderAircraft(lastAircraftData);
+                        setAircraftCount(lastAircraftData.length);
+                        setStatus('ok', 'Live');
+                        showLoading(false);
+                    })
+                    .catch(function (err) {
+                        console.error('Fetch error:', err);
+                        setStatus('error', err.message || 'Error');
+                        showLoading(false);
+
+                        if (err.message && err.message.indexOf('Rate limited') !== -1) {
+                            clearInterval(refreshTimer);
+                            setTimeout(function () {
+                                fetchAircraft();
+                                refreshTimer = setInterval(fetchAircraft, REFRESH_INTERVAL_MS);
+                            }, 30000);
+                        }
+                    });
+            }
+
+            // --- Render aircraft markers ---
+            function renderAircraft(aircraft) {
+                aircraftLayer.clearLayers();
+
+                aircraft.forEach(function (ac) {
+                    var isSelected = ac.icao24 === selectedIcao;
+                    var icon = createAircraftIcon(ac.heading, ac.altitude, isSelected);
+                    var marker = L.marker([ac.latitude, ac.longitude], {
+                        icon: icon,
+                        zIndexOffset: isSelected ? 1000 : 0
+                    });
+
+                    marker.on('click', function () {
+                        selectedIcao = ac.icao24;
+                        showInfoPanel(ac);
+                        renderAircraft(lastAircraftData);
+                    });
+
+                    aircraftLayer.addLayer(marker);
+                });
+            }
+
+            // --- Init map ---
+            function init() {
+                map = L.map('map', {
+                    center: [COWRA.lat, COWRA.lng],
+                    zoom: DEFAULT_ZOOM,
+                    zoomControl: false,
+                    attributionControl: true
+                });
+
+                L.control.zoom({ position: 'topleft' }).addTo(map);
+
+                // Dark tile layer
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a> | Data: <a href="https://opensky-network.org">OpenSky Network</a>',
+                    subdomains: 'abcd',
+                    maxZoom: 18
+                }).addTo(map);
+
+                // Cowra marker
+                L.circleMarker([COWRA.lat, COWRA.lng], {
+                    radius: 6,
+                    color: '#f59e0b',
+                    fillColor: '#f59e0b',
+                    fillOpacity: 0.8,
+                    weight: 2
+                }).addTo(map).bindTooltip('Cowra, NSW', {
+                    permanent: true,
+                    direction: 'right',
+                    offset: [8, 0],
+                    className: 'cowra-tooltip'
+                });
+
+                aircraftLayer = L.layerGroup().addTo(map);
+
+                // Controls
+                document.getElementById('btnCenter').addEventListener('click', function () {
+                    map.setView([COWRA.lat, COWRA.lng], DEFAULT_ZOOM);
+                });
+
+                document.getElementById('btnRefresh').addEventListener('click', function () {
+                    fetchAircraft();
+                });
+
+                document.getElementById('btnAustralia').addEventListener('click', function () {
+                    map.fitBounds([
+                        [AUSTRALIA_BOUNDS.lamin, AUSTRALIA_BOUNDS.lomin],
+                        [AUSTRALIA_BOUNDS.lamax, AUSTRALIA_BOUNDS.lomax]
+                    ]);
+                });
+
+                // Refetch on significant map move
+                map.on('moveend', function () {
+                    clearInterval(refreshTimer);
+                    fetchAircraft();
+                    refreshTimer = setInterval(fetchAircraft, REFRESH_INTERVAL_MS);
+                });
+
+                // Initial fetch
+                fetchAircraft();
+                refreshTimer = setInterval(fetchAircraft, REFRESH_INTERVAL_MS);
+
+                // Close info panel on map click (not marker)
+                map.on('click', function () {
+                    if (selectedIcao) {
+                        selectedIcao = null;
+                        removeInfoPanel();
+                        renderAircraft(lastAircraftData);
+                    }
+                });
+            }
+
+            // Add tooltip style
+            var tooltipStyle = document.createElement('style');
+            tooltipStyle.textContent = '.cowra-tooltip { background: rgba(17,24,39,0.9); color: #f59e0b; border: 1px solid #f59e0b; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; } .cowra-tooltip::before { border-right-color: #f59e0b; }';
+            document.head.appendChild(tooltipStyle);
+
+            // Cleanup on unload
+            window.addEventListener('beforeunload', function () {
+                if (refreshTimer) clearInterval(refreshTimer);
+            });
+
+            init();
+        })();
+    </script>
+</body>
+</html>
