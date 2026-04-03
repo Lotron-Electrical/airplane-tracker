@@ -193,22 +193,6 @@
             line-height: 1.6;
         }
 
-        .popup-callsign {
-            font-size: 15px;
-            font-weight: 600;
-            color: #38bdf8;
-            margin-bottom: 6px;
-        }
-
-        .popup-row {
-            display: flex;
-            justify-content: space-between;
-            gap: 16px;
-        }
-
-        .popup-label { color: #64748b; }
-        .popup-value { color: #e2e8f0; font-weight: 500; }
-
         .legend {
             position: absolute;
             bottom: 20px;
@@ -332,6 +316,13 @@
             let refreshTimer = null;
             let infoPanel = null;
 
+            // --- Sanitize HTML ---
+            function esc(str) {
+                var d = document.createElement('div');
+                d.textContent = str;
+                return d.innerHTML;
+            }
+
             // --- Altitude color ---
             function altitudeColor(altMeters) {
                 if (altMeters === null || altMeters <= 0) return '#22c55e';
@@ -434,14 +425,14 @@
                 panel.id = 'infoPanel';
                 panel.innerHTML =
                     '<button class="close-btn" id="closePanel">&times;</button>' +
-                    '<h3>' + (ac.callsign || ac.icao24.toUpperCase()) + '</h3>' +
-                    '<div class="row"><span class="label">ICAO</span><span class="value">' + ac.icao24.toUpperCase() + '</span></div>' +
-                    '<div class="row"><span class="label">Country</span><span class="value">' + (ac.originCountry || '—') + '</span></div>' +
+                    '<h3>' + esc(ac.callsign || ac.icao24.toUpperCase()) + '</h3>' +
+                    '<div class="row"><span class="label">ICAO</span><span class="value">' + esc(ac.icao24.toUpperCase()) + '</span></div>' +
+                    '<div class="row"><span class="label">Country</span><span class="value">' + esc(ac.originCountry || '—') + '</span></div>' +
                     '<div class="row"><span class="label">Altitude</span><span class="value">' + formatAlt(ac.altitude) + '</span></div>' +
                     '<div class="row"><span class="label">Speed</span><span class="value">' + formatSpeed(ac.velocity) + '</span></div>' +
                     '<div class="row"><span class="label">Heading</span><span class="value">' + formatHeading(ac.heading) + '</span></div>' +
                     '<div class="row"><span class="label">Vert. Rate</span><span class="value">' + formatVertRate(ac.verticalRate) + '</span></div>' +
-                    '<div class="row"><span class="label">Squawk</span><span class="value">' + (ac.squawk || '—') + '</span></div>' +
+                    '<div class="row"><span class="label">Squawk</span><span class="value">' + esc(ac.squawk || '—') + '</span></div>' +
                     '<div class="row"><span class="label">Status</span><span class="value">' + (ac.onGround ? 'On Ground' : 'Airborne') + '</span></div>';
 
                 document.body.appendChild(panel);
